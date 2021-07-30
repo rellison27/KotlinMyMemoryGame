@@ -1,6 +1,7 @@
 package com.rellidev.mymemorygame
 
 import android.animation.ArgbEvaluator
+import android.content.Intent
 import android.icu.text.CaseMap
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -21,9 +22,13 @@ import com.rellidev.mymemorygame.models.BoardSize
 import com.rellidev.mymemorygame.models.MemoryCard
 import com.rellidev.mymemorygame.models.MemoryGame
 import com.rellidev.mymemorygame.utils.DEFAULT_ICONS
+import com.rellidev.mymemorygame.utils.EXTRA_BOARD_SIZE
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        private const val CREATE_REQUEST_CODE = 248
+    }
 
     private lateinit var clRoot: ConstraintLayout
     private lateinit var rvBoard: RecyclerView
@@ -68,8 +73,29 @@ class MainActivity : AppCompatActivity() {
                 showNewSizeDialog()
                 return true
             }
+            R.id.mi_custom -> {
+                showCreationDialog()
+                return true
+            }
         }
         return super.onOptionsItemSelected(item)
+    }
+
+    private fun showCreationDialog() {
+        val boardSizeView = LayoutInflater.from(this).inflate(R.layout.dialog_boardsize, null)
+        val radioGroupSize = boardSizeView.findViewById<RadioGroup>(R.id.radioGroup)
+        showAlertDialog("Create your own memory board", boardSizeView, View.OnClickListener {
+            // set a new value for the board value
+            val desiredBoardSize= when (radioGroupSize.checkedRadioButtonId) {
+                R.id.rbEasy  -> BoardSize.EASY
+                R.id.rbMedium -> BoardSize.MEDIUM
+                else -> BoardSize.HARD
+            }
+            // NAvigate to new activity
+            val intent = Intent(this, CreateActvity::class.java)
+            intent.putExtra(EXTRA_BOARD_SIZE, desiredBoardSize)
+            startActivityForResult(intent, CREATE_REQUEST_CODE)
+        })
     }
 
     private fun showNewSizeDialog() {
