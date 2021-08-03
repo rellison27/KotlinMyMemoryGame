@@ -1,6 +1,7 @@
 package com.rellidev.mymemorygame
 
 import android.app.Activity
+import android.app.AlertDialog
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
@@ -15,8 +16,10 @@ import android.text.InputFilter
 import android.text.TextWatcher
 import android.util.Log
 import android.view.MenuItem
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
+import android.widget.ProgressBar
 import android.widget.Toast
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -24,10 +27,7 @@ import com.google.firebase.firestore.ktx.firestore
 import com.google.firebase.ktx.Firebase
 import com.google.firebase.storage.ktx.storage
 import com.rellidev.mymemorygame.models.BoardSize
-import com.rellidev.mymemorygame.utils.BitmapScaler
-import com.rellidev.mymemorygame.utils.EXTRA_BOARD_SIZE
-import com.rellidev.mymemorygame.utils.isPermissionGranted
-import com.rellidev.mymemorygame.utils.requestPermission
+import com.rellidev.mymemorygame.utils.*
 import java.io.ByteArrayOutputStream
 
 class CreateActvity : AppCompatActivity() {
@@ -39,11 +39,13 @@ class CreateActvity : AppCompatActivity() {
         private const val READ_PHOTOS_PERMISSION = android.Manifest.permission.READ_EXTERNAL_STORAGE
         private const val MIN_GAME_LENGTH = 3
         private const val MAX_GAME_LENGTH = 14
+
     }
 
     private lateinit var rvImagePicker: RecyclerView
     private lateinit var etGameName: EditText
     private lateinit var btnSave: Button
+    private lateinit var pbUploading: ProgressBar
 
     private lateinit var adapter: ImagePickerAdapter
     private lateinit var boardSize: BoardSize
@@ -54,11 +56,13 @@ class CreateActvity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_create_actvity)
+        setContentView(R.layout.activity_create)
 
         rvImagePicker = findViewById(R.id.rvImagePicker)
         etGameName = findViewById(R.id.etGameName)
         btnSave = findViewById(R.id.btnSave)
+        pbUploading = findViewById(R.id.pbUploading)
+
 
         boardSize = intent.getSerializableExtra(EXTRA_BOARD_SIZE) as BoardSize
 
@@ -145,13 +149,35 @@ class CreateActvity : AppCompatActivity() {
     }
 
     private fun saveDataToFirebase() {
-        val customGameName = etGameName.text.toString()
         Log.i(TAG, "saveDataToFirebase")
+        btnSave.isEnabled = false
+        val customGameName = etGameName.text.toString()
+        db.collection("games").document(customGameName).get().addOnSuccessListener { document ->
+            if(document != null && document.data != null) {
+                AlertDialog.Builder(this)
+                    .setTitle("Name taken")
+                    .setMessage("A game already exists with the name '$customGameName'. Please choose another")
+                    .setPositiveButton("Ok", null)
+                    .show()
+                btnSave.isEnabled = true
+            } else {
+                handleImageUploading(customGameName)
+            }
+        }.addOnFailureListener{ exception ->
+            Log.e(TAG, "Encountered error while saving memory game", exception)
+            Toast.makeText(this, "Encountered error while saving memory game", Toast.LENGTH_SHORT).show()
+            btnSave.isEnabled = true
+        }
+
+    }
+
+    private fun handleImageUploading(gameName: String) {
+        pbUploading.visibility = View.VISIBLE
         var didEncounterError = false
         val uploadedImageUrls = mutableListOf<String>()
         for((index, photoUri) in chosenImageURis.withIndex()) {
             val imageByteArray = getImageByteArray(photoUri)
-            val filePath = "images/$customGameName/${System.currentTimeMillis()}-${index}.jpg"
+            val filePath = "images/$gameName/${System.currentTimeMillis()}-${index}.jpg"
             val photoReference = storage.reference.child(filePath)
             photoReference.putBytes(imageByteArray)
                 .continueWithTask{ photoUploadTask ->
@@ -165,20 +191,40 @@ class CreateActvity : AppCompatActivity() {
                         return@addOnCompleteListener
                     }
                     if (didEncounterError) {
+                        pbUploading.visibility = View.GONE
                         return@addOnCompleteListener
                     }
                     val downloadUrl = downloadUrlTask.result.toString()
                     uploadedImageUrls.add(downloadUrl)
+                    pbUploading.progress = uploadedImageUrls.size * 100 / chosenImageURis.size
                     Log.i(TAG, "Finised uploading $photoUri, num upload ${uploadedImageUrls.size}")
                     if (uploadedImageUrls.size == chosenImageURis.size) {
-                        handleAlImagesUploaded(customGameName, uploadedImageUrls)
+                        handleAlImagesUploaded(gameName, uploadedImageUrls)
                     }
                 }
         }
     }
 
     private fun handleAlImagesUploaded(gameName: String, imageUrls: MutableList<String>) {
-        // TODO: upload this info to Firestore
+        db.collection("games").document(gameName)
+            .set(mapOf("images" to imageUrls))
+            .addOnCompleteListener { gameCreationTask ->
+                pbUploading.visibility = View.GONE
+                if (!gameCreationTask.isSuccessful) {
+                    Log.e(TAG, "exceptioin with game creation", gameCreationTask.exception)
+                    Toast.makeText(this, "Failed game creation", Toast.LENGTH_SHORT).show()
+                    return@addOnCompleteListener
+                }
+                Log.i(TAG, "Successfully created game $gameName")
+                AlertDialog.Builder(this)
+                    .setTitle("Upload Complete! Let's play your game '$gameName'")
+                    .setPositiveButton("Ok"){ _, _ ->
+                        val resultData = Intent()
+                        resultData.putExtra(EXTRA_GAME_NAME, gameName)
+                        setResult(Activity.RESULT_OK, resultData)
+                        finish()
+                    }.show()
+            }
     }
 
     private fun getImageByteArray(photoUri: Uri): ByteArray {
