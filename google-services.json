@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "673117535790",
+    "project_id": "my-memory-dbbec",
+    "storage_bucket": "my-memory-dbbec.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:673117535790:android:9abb41c46bd22fda22a9bf",
+        "android_client_info": {
+          "package_name": "com.rellidev.mymemorygame"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "673117535790-shdl9jj4s4nv6gllf8qvamri7ka67oqb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAKvZctkzXBPuZBmbpHR7fUW5OfW52xW3A"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "673117535790-shdl9jj4s4nv6gllf8qvamri7ka67oqb.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
